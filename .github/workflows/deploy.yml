@@ -44,7 +44,7 @@ jobs:
           # stop old gunicorn process if running
           sudo pkill -f gunicorn || true
 
-          sudo nohup venv/bin/gunicorn -b 0.0.0.0:80 app:handler > app.log 2>&1 &
+          sudo nohup venv/bin/gunicorn -b 0.0.0.0:80 app:app > app.log 2>&1 &
           # start gunicorn in background
           # nohup venv/bin/gunicorn -b 0.0.0.0:80 app:app > app.log 2>&1 &
           # disown
