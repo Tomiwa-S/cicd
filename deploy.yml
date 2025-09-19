@@ -1,0 +1,50 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }} 
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          # go to app folder (create if missing)
+          cd ~/app || mkdir ~/app && cd ~/app
+
+          # pull latest code
+          if [ -d .git ]; then
+            git reset --hard
+            git pull
+          else
+            git clone https://github.com/Tomiwa-S/cicd.git .
+          fi
+
+          # setup venv if missing
+          if [ ! -d "venv" ]; then
+            sudo apt install python3.12-venv -y
+            python3 -m venv venv
+          fi
+          source venv/bin/activate
+          pkill -f gunicorn || true
+          # install requirements
+          pip install --upgrade pip
+          pip install flask gunicorn
+
+          # stop old gunicorn process if running
+          sudo pkill -f gunicorn || true
+
+          sudo nohup venv/bin/gunicorn -b 0.0.0.0:80 app:app > app.log 2>&1 &
+          # start gunicorn in background
+          # nohup venv/bin/gunicorn -b 0.0.0.0:80 app:app > app.log 2>&1 &
+          # disown

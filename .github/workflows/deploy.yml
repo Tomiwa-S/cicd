@@ -32,19 +32,62 @@ jobs:
 
           # setup venv if missing
           if [ ! -d "venv" ]; then
+            sudo apt update
             sudo apt install python3.12-venv -y
             python3 -m venv venv
           fi
+          
           source venv/bin/activate
-          pkill -f gunicorn || true
+          
           # install requirements
           pip install --upgrade pip
           pip install flask gunicorn
 
-          # stop old gunicorn process if running
+          # stop old gunicorn processes
+          pkill -f gunicorn || true
           sudo pkill -f gunicorn || true
+          
+          # Wait for processes to fully stop
+          sleep 3
 
-          sudo nohup venv/bin/gunicorn -b 0.0.0.0:80 app:app > app.log 2>&1 &
-          # start gunicorn in background
-          # nohup venv/bin/gunicorn -b 0.0.0.0:80 app:app > app.log 2>&1 &
-          # disown
+          # Method 1: Use port 8000 (no sudo needed)
+          echo "Starting gunicorn on port 8000..."
+          nohup ./venv/bin/gunicorn -b 0.0.0.0:8000 app:app \
+            --access-logfile access.log \
+            --error-logfile error.log \
+            --log-file app.log \
+            --daemon
+          
+          # Wait and verify
+          sleep 3
+          
+          if pgrep -f "gunicorn.*app:app" > /dev/null; then
+            echo "✅ Gunicorn started successfully on port 8000"
+            
+            # Test the application
+            if curl -f http://localhost:8000/ > /dev/null 2>&1; then
+              echo "✅ Application is responding"
+            else
+              echo "❌ Application not responding, checking logs..."
+              tail -10 error.log 2>/dev/null || echo "No error log found"
+            fi
+          else
+            echo "❌ Gunicorn failed to start, trying alternative method..."
+            
+            # Method 2: Use screen session for better process management
+            sudo apt install screen -y > /dev/null 2>&1
+            screen -dmS flask_app bash -c 'cd ~/app && source venv/bin/activate && venv/bin/gunicorn -b 0.0.0.0:8000 app:app --access-logfile access.log --error-logfile error.log'
+            
+            sleep 3
+            
+            if pgrep -f "gunicorn.*app:app" > /dev/null; then
+              echo "✅ Gunicorn started in screen session"
+            else
+              echo "❌ All methods failed, showing logs:"
+              tail -20 error.log 2>/dev/null || echo "No error log"
+              tail -20 app.log 2>/dev/null || echo "No app log"
+              exit 1
+            fi
+          fi
+          
+          echo "🎉 Deployment completed! App should be running on port 8000"
