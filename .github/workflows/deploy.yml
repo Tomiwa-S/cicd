@@ -42,7 +42,7 @@ jobs:
           pip install flask gunicorn
 
           # stop old gunicorn process if running
-          pkill -f gunicorn || true
+          sudo pkill -f gunicorn || true
 
           sudo nohup venv/bin/gunicorn -b 0.0.0.0:80 app:handler > app.log 2>&1 &
           # start gunicorn in background
